@@ -1,0 +1,272 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calorie & Macro Tracker</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      background: #f0f2f5;
+    }
+    nav {
+      display: flex;
+      background: #333;
+      color: white;
+      justify-content: space-around;
+      padding: 1rem;
+    }
+    nav div {
+      cursor: pointer;
+    }
+    .tab {
+      display: none;
+      padding: 1rem;
+    }
+    .tab.active {
+      display: block;
+    }
+    .section {
+      background: white;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      max-width: 600px;
+      margin: 1rem auto;
+    }
+    input, select, button {
+      width: 100%;
+      padding: 0.5rem;
+      margin: 0.3rem 0;
+      font-size: 1rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.5rem;
+      text-align: center;
+    }
+    .progress-container {
+      background: #ddd;
+      border-radius: 5px;
+      overflow: hidden;
+      margin-bottom: 1rem;
+    }
+    .progress-bar {
+      height: 20px;
+      background: #4caf50;
+      color: white;
+      text-align: center;
+    }
+    #foodList {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <div onclick="switchTab('log')">📆 Daily Log</div>
+    <div onclick="switchTab('library')">📚 Food Library</div>
+    <div onclick="switchTab('history')">📈 History</div>
+  </nav>
+
+  <div id="log" class="tab active">
+    <div class="section">
+      <h2>Set General Daily Targets</h2>
+      <label>Calories</label>
+      <input id="targetCalories" type="number" placeholder="Daily Calorie Target" />
+      <label>Protein (g)</label>
+      <input id="targetProtein" type="number" placeholder="Daily Protein Target" />
+      <button onclick="saveTargets()">Save Targets</button>
+    </div>
+
+    <div class="section">
+      <h2>Log a Food</h2>
+      <select id="foodSelect"></select>
+      <input id="gramsEaten" type="number" placeholder="Grams Eaten" />
+      <select id="mealType">
+        <option value="Breakfast">Breakfast</option>
+        <option value="Lunch">Lunch</option>
+        <option value="Dinner">Dinner</option>
+        <option value="Snack">Snack</option>
+      </select>
+      <button onclick="logMeal()">Log Food</button>
+    </div>
+
+    <div class="section">
+      <h2>Today's Log</h2>
+      <table><thead>
+        <tr><th>Meal</th><th>Food</th><th>Grams</th><th>Calories</th><th>Protein</th></tr>
+      </thead><tbody id="mealLog"></tbody></table>
+      <div class="progress-container"><div id="calProgress" class="progress-bar"></div></div>
+      <div class="progress-container"><div id="proteinProgress" class="progress-bar"></div></div>
+    </div>
+  </div>
+
+  <div id="library" class="tab">
+    <div class="section">
+      <h2>Add Food</h2>
+      <input id="foodName" placeholder="Food Name" />
+      <input id="brand" placeholder="Brand" />
+      <input id="calories" type="number" placeholder="Calories (per 100g)" />
+      <input id="protein" type="number" placeholder="Protein (g)" />
+      <button onclick="addFood()">Add Food</button>
+    </div>
+
+    <div class="section">
+      <h2>Food Library</h2>
+      <div id="foodList"></div>
+    </div>
+  </div>
+
+  <div id="history" class="tab">
+    <div class="section">
+      <h2>View Past Days</h2>
+      <input id="viewDate" type="date" onchange="renderLog()" />
+      <table><thead>
+        <tr><th>Meal</th><th>Food</th><th>Grams</th><th>Calories</th><th>Protein</th></tr>
+      </thead><tbody id="pastLog"></tbody></table>
+      <div class="progress-container"><div id="histCal" class="progress-bar"></div></div>
+      <div class="progress-container"><div id="histProtein" class="progress-bar"></div></div>
+    </div>
+
+    <div class="section">
+      <h2>7 Day Overview</h2>
+      <div id="overview7"></div>
+    </div>
+  </div>
+
+  <script>
+    const foods = JSON.parse(localStorage.getItem('foods')) || [
+      { id: 1, name: 'Chicken Breast', brand: 'Generic', calories: 165, protein: 31 },
+      { id: 2, name: 'Oats', brand: 'Quaker', calories: 389, protein: 17 },
+    ];
+    const logs = JSON.parse(localStorage.getItem('logs')) || {};
+    const targets = JSON.parse(localStorage.getItem('targets')) || { calories: 2000, protein: 150 };
+
+    const today = new Date().toISOString().split('T')[0];
+
+    function saveData() {
+      localStorage.setItem('foods', JSON.stringify(foods));
+      localStorage.setItem('logs', JSON.stringify(logs));
+      localStorage.setItem('targets', JSON.stringify(targets));
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+    }
+
+    function saveTargets() {
+      targets.calories = parseInt(document.getElementById('targetCalories').value);
+      targets.protein = parseInt(document.getElementById('targetProtein').value);
+      saveData();
+      renderToday();
+    }
+
+    function updateDropdown() {
+      const select = document.getElementById('foodSelect');
+      select.innerHTML = '';
+      foods.forEach((f, i) => {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = `${f.name} (${f.brand})`;
+        select.appendChild(opt);
+      });
+    }
+
+    function addFood() {
+      const name = document.getElementById('foodName').value.trim();
+      const brand = document.getElementById('brand').value.trim();
+      const calories = parseFloat(document.getElementById('calories').value);
+      const protein = parseFloat(document.getElementById('protein').value);
+      const exists = foods.some(f => f.name.toLowerCase() === name.toLowerCase() && f.brand.toLowerCase() === brand.toLowerCase());
+
+      if (exists) {
+        alert('This food already exists!');
+        return;
+      }
+
+      const id = Date.now();
+      foods.push({ id, name, brand, calories, protein });
+      saveData();
+      updateDropdown();
+      renderFoodList();
+    }
+
+    function renderFoodList() {
+      const list = document.getElementById('foodList');
+      list.innerHTML = '';
+      foods.forEach(f => {
+        const div = document.createElement('div');
+        div.textContent = `#${f.id} - ${f.name} (${f.brand}) | ${f.calories} kcal | ${f.protein}g protein`;
+        list.appendChild(div);
+      });
+    }
+
+    function logMeal() {
+      const index = parseInt(document.getElementById('foodSelect').value);
+      const grams = parseFloat(document.getElementById('gramsEaten').value);
+      const meal = document.getElementById('mealType').value;
+      const f = foods[index];
+      const entry = {
+        name: f.name,
+        grams,
+        calories: (f.calories * grams / 100).toFixed(1),
+        protein: (f.protein * grams / 100).toFixed(1),
+        meal
+      };
+      if (!logs[today]) logs[today] = [];
+      logs[today].push(entry);
+      saveData();
+      renderToday();
+    }
+
+    function renderToday() {
+      const tbody = document.getElementById('mealLog');
+      tbody.innerHTML = '';
+      let totalCal = 0, totalProt = 0;
+      (logs[today] || []).forEach(l => {
+        tbody.innerHTML += `<tr><td>${l.meal}</td><td>${l.name}</td><td>${l.grams}</td><td>${l.calories}</td><td>${l.protein}</td></tr>`;
+        totalCal += parseFloat(l.calories);
+        totalProt += parseFloat(l.protein);
+      });
+      document.getElementById('calProgress').style.width = `${(totalCal / targets.calories) * 100}%`;
+      document.getElementById('calProgress').textContent = `Calories: ${Math.round(totalCal)} / ${targets.calories}`;
+      document.getElementById('proteinProgress').style.width = `${(totalProt / targets.protein) * 100}%`;
+      document.getElementById('proteinProgress').textContent = `Protein: ${Math.round(totalProt)} / ${targets.protein}`;
+    }
+
+    function renderLog() {
+      const d = document.getElementById('viewDate').value;
+      const tbody = document.getElementById('pastLog');
+      tbody.innerHTML = '';
+      let c = 0, p = 0;
+      (logs[d] || []).forEach(l => {
+        tbody.innerHTML += `<tr><td>${l.meal}</td><td>${l.name}</td><td>${l.grams}</td><td>${l.calories}</td><td>${l.protein}</td></tr>`;
+        c += parseFloat(l.calories);
+        p += parseFloat(l.protein);
+      });
+      document.getElementById('histCal').style.width = `${(c / targets.calories) * 100}%`;
+      document.getElementById('histCal').textContent = `Calories: ${Math.round(c)} / ${targets.calories}`;
+      document.getElementById('histProtein').style.width = `${(p / targets.protein) * 100}%`;
+      document.getElementById('histProtein').textContent = `Protein: ${Math.round(p)} / ${targets.protein}`;
+    }
+
+    document.getElementById('targetCalories').value = targets.calories;
+    document.getElementById('targetProtein').value = targets.protein;
+    document.getElementById('viewDate').value = today;
+    updateDropdown();
+    renderFoodList();
+    renderToday();
+  </script>
+</body>
+</html>
